@@ -4,48 +4,17 @@
 #include <graphics.h>
 #include <cmath>
 #include <string>
+#include "game.h"
 
-#define WindowWidth         960
-#define WindowHeight        720
-
-#define SymbolSize          36                  // SymbolSize *MUST* be an even integer!
 constexpr int PieceRadius = (int)(1.414 * SymbolSize / 2) + 2;
 constexpr int GridSize = (int)(PieceRadius * 2.22) + 1;
 constexpr int GridWeight = (int)(GridSize / 50);
 
 #define P(pos)              (pos) * GridSize
 
-#define _King               _T("帥")
-#define _Advisor            _T("士")
-#define _Bishop             _T("相")
-#define _Knight             _T("馬")
-#define _Roof               _T("車")
-#define _Canon              _T("炮")
-#define _Pawn               _T("兵")
-#define _king               _T("將")
-#define _advisor            _T("仕")
-#define _bishop             _T("象")
-#define _knight             _T("馬")
-#define _roof               _T("車")
-#define _canon              _T("砲")
-#define _pawn               _T("卒")
-
-#define GRAY                0x7F7F7F
-#define OFFWHITE            0xD6EEF7
-#define CRIMSON             0x462FBF
-#define NAVAJO              0xADDEFF
-#define MOCCASIN            0xB5E4FF
-#define BRULYWOOD           0x87B8DE
-
-#define BKGCOLOR            MOCCASIN
-#define CHESSCOLOR          BRULYWOOD
-#define REDCOLOR            CRIMSON
-#define BALCKCOLOR          BLACK
-#define GRIDCOLOR           BLACK
-#define TEXTCOLOR           WHITE
-
-inline void bettersolidcircle(int x, int y, int radius)
 // a better version of solidcircle()
+inline void bettersolidcircle(int x, int y, int radius)
+
 {
     LINESTYLE __linestyle;
     getlinestyle(&__linestyle);
@@ -62,8 +31,8 @@ inline void bettersolidcircle(int x, int y, int radius)
 }
 
 LOGFONT chessfont;
-void drawpiece(int x, int y, COLORREF color, const wchar_t* symbol, LOGFONT font = chessfont)
 // draw a chess piece at position (x, y)
+void drawpiece(int x, int y, COLORREF color, const wchar_t* symbol, LOGFONT font = chessfont)
 {
     assert(x > PieceRadius && y > PieceRadius && x + PieceRadius < WindowWidth&& y + PieceRadius < WindowHeight);
 
@@ -92,7 +61,29 @@ void drawpiece(int x, int y, COLORREF color, const wchar_t* symbol, LOGFONT font
     setlinecolor(__linecolor);                                  // reset to origin
 }
 
+std::string ChessBoard;
+// draw a chess piece at board grid (xPos, yPos)
+void drawpiece(int xPos, int yPos, char symbolchar) {
+    COLORREF color = std::islower(symbolchar) ? BLACKCOLOR : REDCOLOR;
+
+    if (symbolchar == 'K') drawpiece(P(yPos), P(xPos), color, _King);
+    else if (symbolchar == 'A') drawpiece(P(yPos), P(xPos), color, _Advisor);
+    else if (symbolchar == 'B') drawpiece(P(yPos), P(xPos), color, _Bishop);
+    else if (symbolchar == 'N') drawpiece(P(yPos), P(xPos), color, _Knight);
+    else if (symbolchar == 'R') drawpiece(P(yPos), P(xPos), color, _Rook);
+    else if (symbolchar == 'C') drawpiece(P(yPos), P(xPos), color, _Cannon);
+    else if (symbolchar == 'P') drawpiece(P(yPos), P(xPos), color, _Pawn);
+    else if (symbolchar == 'k') drawpiece(P(yPos), P(xPos), color, _king);
+    else if (symbolchar == 'a') drawpiece(P(yPos), P(xPos), color, _advisor);
+    else if (symbolchar == 'b') drawpiece(P(yPos), P(xPos), color, _bishop);
+    else if (symbolchar == 'n') drawpiece(P(yPos), P(xPos), color, _knight);
+    else if (symbolchar == 'r') drawpiece(P(yPos), P(xPos), color, _rook);
+    else if (symbolchar == 'c') drawpiece(P(yPos), P(xPos), color, _cannon);
+    else if (symbolchar == 'p') drawpiece(P(yPos), P(xPos), color, _pawn);
+}
+
 const int Seam = 4, Dsti = 12;
+// draw chess board, Seam and Dsti is about how those "target"s perform.
 void drawboard() {
     LINESTYLE __linestyle;
     getlinestyle(&__linestyle);
@@ -146,10 +137,17 @@ void drawboard() {
     setfillcolor(__fillcolor);                                      // reset to origin
 }
 
+// render board AND all chess pieces
 void render() {
     drawboard();
+    for (int row = 1; row <= 10; row++) {
+        for (int column = 1; column <= 9; column++) {
+            drawpiece(row, column, ChessBoard[(row - 1) * 9 + (column - 1)]);
+        }
+    }
 }
 
+// everything you shall do before run anything
 void init() {
     gettextstyle(&chessfont);
     chessfont.lfHeight = SymbolSize;
@@ -157,19 +155,20 @@ void init() {
     _tcscpy_s(chessfont.lfFaceName, _T("HanWangWeBe"));
     chessfont.lfQuality = ANTIALIASED_QUALITY;
     setbkmode(TRANSPARENT);
+
+    /*std::string*/ ChessBoard = \
+        "rnbakabnr" \
+        "........." \
+        ".c.....c." \
+        "p.p.p.p.p" \
+        "........." \
+        "........." \
+        "P.P.P.P.P" \
+        ".C.....C." \
+        "........." \
+        "RNBAKABNR";
 }
 
-std::string ChessBoard = \
-"rnbakabnr" \
-"........." \
-".c.....c." \
-"p.p.p.p.p" \
-"........." \
-"........." \
-"P.P.P.P.P" \
-".C.....C." \
-"........." \
-"RNBAKABNR";
 int main()
 {
     initgraph(WindowWidth, WindowHeight);
@@ -177,18 +176,23 @@ int main()
     BeginBatchDraw();
     cleardevice();
     init();
-    render();
-    FlushBatchDraw();
 
     MOUSEMSG msg;
+    bool doHoldPiece = false;
     while (true) { // for each "frame"
+        render();
+        FlushBatchDraw();
         if (MouseHit()) {
             msg = GetMouseMsg();
-            if (msg.uMsg == WM_LBUTTONDOWN) {
+            if (msg.uMsg == WM_MBUTTONDOWN) {
                 break;
+            }
+            else if (msg.uMsg == WM_LBUTTONDBLCLK) {
+
             }
             else continue;
         }
+        FlushBatchDraw();
     }
 
     drawpiece(WindowWidth / 2, WindowHeight / 2, REDCOLOR, _T("蘑"));

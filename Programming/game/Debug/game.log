@@ -1,4 +1,4 @@
 ﻿  game.cpp
-D:\Program\homework\Programming\game\game.cpp(81,38): warning C4244: “参数”: 从“double”转换到“int”，可能丢失数据
-D:\Program\homework\Programming\game\game.cpp(86,28): warning C4244: “参数”: 从“double”转换到“int”，可能丢失数据
+D:\Program\homework\Programming\game\game.cpp(82,38): warning C4244: “参数”: 从“double”转换到“int”，可能丢失数据
+D:\Program\homework\Programming\game\game.cpp(87,28): warning C4244: “参数”: 从“double”转换到“int”，可能丢失数据
   game.vcxproj -> D:\Program\homework\Programming\game\Debug\game.exe
