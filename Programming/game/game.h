@@ -1,14 +1,14 @@
 #pragma once
 
 #define _King               _T("帥")
-#define _Advisor            _T("士")
+#define _Advisor            _T("仕")
 #define _Bishop             _T("相")
 #define _Knight             _T("馬")
 #define _Rook               _T("車")
 #define _Cannon             _T("炮")
 #define _Pawn               _T("兵")
 #define _king               _T("將")
-#define _advisor            _T("仕")
+#define _advisor            _T("士")
 #define _bishop             _T("象")
 #define _knight             _T("馬")
 #define _rook               _T("車")
@@ -29,7 +29,9 @@
 #define BLACKCOLOR          BLACK
 #define GRIDCOLOR           BLACK
 #define TEXTCOLOR           WHITE
+#define FOCUSCOLOR          BLUE
 
 #define WindowWidth         960
 #define WindowHeight        720
 #define SymbolSize          36                  // SymbolSize *MUST* be an even integer!
+#define CHESSFONT          _T("HanWangWeBe")

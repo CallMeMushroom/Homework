@@ -4,6 +4,8 @@
 #include <graphics.h>
 #include <cmath>
 #include <string>
+#include <vector>
+#include <set>
 #include "game.h"
 
 constexpr int PieceRadius = (int)(1.414 * SymbolSize / 2) + 2;
@@ -12,9 +14,13 @@ constexpr int GridWeight = (int)(GridSize / 50);
 
 #define P(pos)              (pos) * GridSize
 
-// a better version of solidcircle()
-inline void bettersolidcircle(int x, int y, int radius)
+// sqaure of distance from (x0, y0) to (x, y), pure math
+inline int distsquare(int x, int y, int x0, int y0) {
+    return (x - x0) * (x - x0) + (y - y0) * (y - y0);
+}
 
+// a better version of solidcircle()
+void bettersolidcircle(int x, int y, int radius)
 {
     LINESTYLE __linestyle;
     getlinestyle(&__linestyle);
@@ -30,6 +36,60 @@ inline void bettersolidcircle(int x, int y, int radius)
     setlinecolor(__linecolor);                      // reset to orgin
 }
 
+// draw chess board, seam and dest is about how those "target"s perform.
+void drawboard(const int seam = 4, const int dest = 12) {
+    LINESTYLE __linestyle;
+    getlinestyle(&__linestyle);
+    COLORREF __linecolor = getlinecolor();                          // copy origin line style & color
+    COLORREF __fillcolor = getfillcolor();                          // copy origin fill color
+
+    setlinestyle(PS_SOLID, GridWeight);
+    setlinecolor(GRIDCOLOR);
+    setfillcolor(BKGCOLOR);
+
+    solidrectangle(P(0), P(0), P(10), P(11));                       // clear board
+
+    for (int j = 1; j <= 10; j++) {
+        line(P(1), P(j), P(9), P(j));
+    }
+    for (int i = 1; i <= 9; i++) {
+        line(P(i), P(1), P(i), P(10));
+    }                                                               // draw basic board grid
+    solidrectangle(P(1) + 1, P(5) + 1, P(9) - 1, P(6) - 1);         // erase lines that are over Chuhe Hanjie
+    line(P(4), P(1), P(6), P(3));
+    line(P(6), P(1), P(4), P(3));
+    line(P(4), P(10), P(6), P(8));
+    line(P(6), P(10), P(4), P(8));                                  // draw diagnals of the Palace
+
+    int targets[][2] = {                                            // positions of each "target" on Canon and Pawn
+        {2, 3}, {8, 3}, {1, 4}, {3, 4}, {5, 4}, {7, 4}, {9, 4},
+        {2, 8}, {8, 8}, {1, 7}, {3, 7}, {5, 7}, {7, 7}, {9, 7}
+    };
+    int sgnlist[][2] = { {-1, -1}, {-1, 1}, {1, -1}, {1, 1} };
+    for (auto target : targets) {                                   // for target in targets: for pos in corners: line(vrtc); line(hrzn)
+        int x = P(target[0]), y = P(target[1]);
+        for (auto sgn : sgnlist) {
+            line(x + sgn[0] * seam, y + sgn[1] * seam, x + sgn[0] * dest, y + sgn[1] * seam);       // draw a target that weight is 1
+            line(x + sgn[0] * seam, y + sgn[1] * seam, x + sgn[0] * seam, y + sgn[1] * dest);
+            x += sgn[0]; y += sgn[1];
+            line(x + sgn[0] * seam, y + sgn[1] * seam, x + sgn[0] * (dest - 1), y + sgn[1] * seam); // draw another further to target center
+            line(x + sgn[0] * seam, y + sgn[1] * seam, x + sgn[0] * seam, y + sgn[1] * (dest - 1));
+            x -= sgn[0]; y -= sgn[1];
+        }
+    }
+    setlinestyle(PS_SOLID, 18);
+    setlinecolor(BKGCOLOR);
+    rectangle(P(1) - 9, P(1) - 9, P(9) + 10, P(10) + 10);           // erase out-of-range target halves
+
+    setlinestyle(PS_SOLID, 3);
+    setlinecolor(GRIDCOLOR);
+    rectangle(P(1) - 5, P(1) - 5, P(9) + 6, P(10) + 6);             // draw bold border
+
+    setlinestyle(&__linestyle);
+    setlinecolor(__linecolor);
+    setfillcolor(__fillcolor);                                      // reset to origin
+}
+
 LOGFONT chessfont;
 // draw a chess piece at position (x, y)
 void drawpiece(int x, int y, COLORREF color, const wchar_t* symbol, LOGFONT font = chessfont)
@@ -37,6 +97,7 @@ void drawpiece(int x, int y, COLORREF color, const wchar_t* symbol, LOGFONT font
     assert(x > PieceRadius && y > PieceRadius && x + PieceRadius < WindowWidth&& y + PieceRadius < WindowHeight);
 
     COLORREF __fillcolor = getfillcolor();                      // copy origin fill color
+    COLORREF __bkcolor = getbkcolor();                          // copy origin background color
     LOGFONT __textstyle;
     gettextstyle(&__textstyle);
     COLORREF __textcolor = gettextcolor();                      // copy origin text style & color
@@ -45,6 +106,7 @@ void drawpiece(int x, int y, COLORREF color, const wchar_t* symbol, LOGFONT font
     COLORREF __linecolor = getlinecolor();                      // copy origin line style & color
 
     setfillcolor(CHESSCOLOR);
+    setbkcolor(CHESSCOLOR);
     settextstyle(&font);
     settextcolor(color);
     setlinestyle(PS_SOLID, std::round(PieceRadius * 0.075));
@@ -55,13 +117,14 @@ void drawpiece(int x, int y, COLORREF color, const wchar_t* symbol, LOGFONT font
     circle(x, y, std::round(PieceRadius * 0.9));
 
     setfillcolor(__fillcolor);
+    setbkcolor(__bkcolor);
     settextstyle(&__textstyle);
     settextcolor(__textcolor);
     setlinestyle(&__linestyle);
     setlinecolor(__linecolor);                                  // reset to origin
 }
 
-std::string ChessBoard;
+std::string board;
 // draw a chess piece at board grid (xPos, yPos)
 void drawpiece(int xPos, int yPos, char symbolchar) {
     COLORREF color = std::islower(symbolchar) ? BLACKCOLOR : REDCOLOR;
@@ -82,69 +145,42 @@ void drawpiece(int xPos, int yPos, char symbolchar) {
     else if (symbolchar == 'p') drawpiece(P(yPos), P(xPos), color, _pawn);
 }
 
-const int Seam = 4, Dsti = 12;
-// draw chess board, Seam and Dsti is about how those "target"s perform.
-void drawboard() {
-    LINESTYLE __linestyle;
-    getlinestyle(&__linestyle);
-    COLORREF __linecolor = getlinecolor();                          // copy origin line style & color
-    COLORREF __fillcolor = getfillcolor();                          // copy origin fill color
+std::set<std::pair<int, int>> choosings;
+// show board and all chess pieces and chosen frames
+void render() {
+    // TODO: make some effects for choosing (focus) pieces
+    drawboard();
 
-    setlinestyle(PS_SOLID, GridWeight);
-    setlinecolor(GRIDCOLOR);
-    setfillcolor(BKGCOLOR);
-
-    for (int j = 1; j <= 10; j++) {
-        line(P(1), P(j), P(9), P(j));
-    }
-    for (int i = 1; i <= 9; i++) {
-        line(P(i), P(1), P(i), P(10));
-    }                                                               // draw basic board grid
-    solidrectangle(P(1) + 1, P(5) + 1, P(9) - 1, P(6) - 1);         // erase lines that are over Chuhe Hanjie
-    line(P(4), P(1), P(6), P(3));
-    line(P(6), P(1), P(4), P(3));
-    line(P(4), P(10), P(6), P(8));
-    line(P(6), P(10), P(4), P(8));                                  // draw diagnals of the Palace
-
-    int targets[][2] = {                                            // positions of each "target" on Canon and Pawn
-        {2, 3}, {8, 3}, {1, 4}, {3, 4}, {5, 4}, {7, 4}, {9, 4},
-        {2, 8}, {8, 8}, {1, 7}, {3, 7}, {5, 7}, {7, 7}, {9, 7}
-    };
-    int sgnlist[][2] = {                                            // sgnlist controls offsets of each of 4 corners of one target
-        {-1, -1}, {-1, 1}, {1, -1}, {1, 1}
-    };
-    for (int* target : targets) {                                   // for target in targets: for pos in corners: line(vrtc); line(hrzn)
-        int x = P(target[0]), y = P(target[1]);
-        for (int* sgn : sgnlist) {
-            line(x + sgn[0] * Seam, y + sgn[1] * Seam, x + sgn[0] * Dsti, y + sgn[1] * Seam);       // draw a target that weight is 1
-            line(x + sgn[0] * Seam, y + sgn[1] * Seam, x + sgn[0] * Seam, y + sgn[1] * Dsti);
-            x += sgn[0]; y += sgn[1];
-            line(x + sgn[0] * Seam, y + sgn[1] * Seam, x + sgn[0] * (Dsti - 1), y + sgn[1] * Seam); // draw another further to target center
-            line(x + sgn[0] * Seam, y + sgn[1] * Seam, x + sgn[0] * Seam, y + sgn[1] * (Dsti - 1));
-            x -= sgn[0]; y -= sgn[1];
+    int size = PieceRadius / 2;
+    int sgnlist[][2] = { {-1, -1}, {-1, 1}, {1, -1}, {1, 1} };
+    for (auto choose : choosings) {
+        int centre_x = P(choose.second), centre_y = P(choose.first);
+        for (auto sgn : sgnlist) {
+            int x = centre_x + sgn[0] * size;
+            int y = centre_y + sgn[1] * size;
+            for (int i = x + sgn[0] * size; i != x; i -= sgn[0])
+                for (int j = y + sgn[1] * size; j != y; j -= sgn[1])
+                    if (distsquare(x, y, i, j) > size * size + 4)
+                        putpixel(i, j, FOCUSCOLOR);
+                    else break;
         }
     }
-    setlinestyle(PS_SOLID, 18);
-    setlinecolor(BKGCOLOR);
-    rectangle(P(1) - 9, P(1) - 9, P(9) + 10, P(10) + 10);           // erase out-of-range target halves
 
-    setlinestyle(PS_SOLID, 3);
-    setlinecolor(GRIDCOLOR);
-    rectangle(P(1) - 5, P(1) - 5, P(9) + 6, P(10) + 6);             // draw bold border
-
-    setlinestyle(&__linestyle);
-    setlinecolor(__linecolor);
-    setfillcolor(__fillcolor);                                      // reset to origin
-}
-
-// render board AND all chess pieces
-void render() {
-    drawboard();
     for (int row = 1; row <= 10; row++) {
         for (int column = 1; column <= 9; column++) {
-            drawpiece(row, column, ChessBoard[(row - 1) * 9 + (column - 1)]);
+            drawpiece(row, column, board[row * 10 + column]);
         }
     }
+}
+
+bool ischoosing(MOUSEMSG mouse, int xPos, int yPos) {
+    if (xPos < 1 || xPos > 10 || yPos < 1 || yPos > 9) return false;
+
+    int x = mouse.x, x0 = P(yPos);
+    int y = mouse.y, y0 = P(xPos);
+    if (distsquare(x, y, x0, y0) > PieceRadius * PieceRadius) return false;
+
+    return true;
 }
 
 // everything you shall do before run anything
@@ -152,52 +188,98 @@ void init() {
     gettextstyle(&chessfont);
     chessfont.lfHeight = SymbolSize;
     chessfont.lfWeight = FW_BOLD;
-    _tcscpy_s(chessfont.lfFaceName, _T("HanWangWeBe"));
+    _tcscpy_s(chessfont.lfFaceName, CHESSFONT);
     chessfont.lfQuality = ANTIALIASED_QUALITY;
-    setbkmode(TRANSPARENT);
+    //setbkmode(TRANSPARENT);
 
-    /*std::string*/ ChessBoard = \
-        "rnbakabnr" \
-        "........." \
-        ".c.....c." \
-        "p.p.p.p.p" \
-        "........." \
-        "........." \
-        "P.P.P.P.P" \
-        ".C.....C." \
-        "........." \
-        "RNBAKABNR";
+    /*std::string*/ board = /* board[row * 10 + column] represents (row, column) */ \
+        ".........." \
+        ".rnbakabnr" \
+        ".         " \
+        ". c     c " \
+        ".p p p p p" \
+        ".         " \
+        ".         " \
+        ".P P P P P" \
+        ". C     C " \
+        ".         " \
+        ".RNBAKABNR";
 }
 
 int main()
 {
-    initgraph(WindowWidth, WindowHeight);
+    assert(WindowWidth > P(10) && WindowHeight > P(11));
+    initgraph(WindowWidth, WindowHeight, SHOWCONSOLE);
     setbkcolor(BKGCOLOR);
     BeginBatchDraw();
     cleardevice();
     init();
 
-    MOUSEMSG msg;
-    bool doHoldPiece = false;
+    MOUSEMSG mouse;
+    struct Hold { bool isHolding = false; int xPos = 0, yPos = 0; char symbolchar = ' '; } hold;
+    std::set<std::pair<int, int>> legalmoves;
+    bool shall_render = true;
+
     while (true) { // for each "frame"
-        render();
-        FlushBatchDraw();
+        if (shall_render) {
+            render();
+            shall_render = false;
+            FlushBatchDraw();
+        }
+
         if (MouseHit()) {
-            msg = GetMouseMsg();
-            if (msg.uMsg == WM_MBUTTONDOWN) {
+            mouse = GetMouseMsg();
+
+            if (mouse.uMsg == WM_MBUTTONDOWN) {
                 break;
             }
-            else if (msg.uMsg == WM_LBUTTONDBLCLK) {
 
+            else if (mouse.uMsg == WM_RBUTTONDOWN) {
+                if (choosings.size() > 0) shall_render = true;
+                hold.isHolding = false;
+                choosings.clear();
             }
+
+            else if (mouse.uMsg == WM_LBUTTONDOWN) {                        // when left-click
+                int xPos = std::round(mouse.y / (double)GridSize);
+                int yPos = std::round(mouse.x / (double)GridSize);          // get where you are hovering on
+
+                if (!ischoosing(mouse, xPos, yPos)) continue;
+
+                if (hold.isHolding) {                                       // to put down a piece
+                    if (legalmoves.count(std::make_pair(xPos, yPos))) {     // is a legal move
+                        assert(choosings.size() == 1);
+                        board[xPos * 10 + yPos] = hold.symbolchar;
+                        board[hold.xPos * 10 + hold.yPos] = ' ';
+                        hold = { false };
+                        choosings.insert(std::make_pair(xPos, yPos));
+                        shall_render = true;
+                    }
+                }
+                else if (!hold.isHolding) {                                 // to pick up a piece
+                    if (board[xPos * 10 + yPos] != ' ') {                   // is not empty
+                        hold = { true, xPos, yPos, board[xPos * 10 + yPos] };
+                        choosings.clear();
+                        choosings.insert(std::make_pair(xPos, yPos));
+                        legalmoves.clear();
+                        shall_render = true;
+                        // TODO: maintain legalmoves
+                        //if (false)
+                        for (int i = 1; i <= 10; i++)
+                            for (int j = 1; j <= 9; j++)
+                                legalmoves.insert(std::make_pair(i, j));
+                    }
+                }
+            }
+
             else continue;
         }
         FlushBatchDraw();
     }
 
-    drawpiece(WindowWidth / 2, WindowHeight / 2, REDCOLOR, _T("蘑"));
+    drawpiece(P(5), P(10), LIGHTBLUE, _MUSHROOM);
+    drawpiece(P(5), P(1), GRAY, _MUSHROOM);
     FlushBatchDraw();
-    std::cerr << GRIDCOLOR;
     _getch();
     closegraph();
     return 0;
