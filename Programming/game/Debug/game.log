@@ -1,6 +1,7 @@
 ﻿  game.cpp
-D:\Program\homework\Programming\game\game.cpp(117,38): warning C4244: “参数”: 从“double”转换到“int”，可能丢失数据
-D:\Program\homework\Programming\game\game.cpp(122,28): warning C4244: “参数”: 从“double”转换到“int”，可能丢失数据
-D:\Program\homework\Programming\game\game.cpp(253,26): warning C4244: “初始化”: 从“double”转换到“int”，可能丢失数据
-D:\Program\homework\Programming\game\game.cpp(254,26): warning C4244: “初始化”: 从“double”转换到“int”，可能丢失数据
+D:\Program\homework\Programming\game\game.cpp(137,38): warning C4244: “参数”: 从“double”转换到“int”，可能丢失数据
+D:\Program\homework\Programming\game\game.cpp(142,28): warning C4244: “参数”: 从“double”转换到“int”，可能丢失数据
+D:\Program\homework\Programming\game\game.cpp(291,26): warning C4244: “初始化”: 从“double”转换到“int”，可能丢失数据
+D:\Program\homework\Programming\game\game.cpp(292,26): warning C4244: “初始化”: 从“double”转换到“int”，可能丢失数据
+D:\Program\homework\Programming\game\game.cpp(246): warning C4715: “islegalmove”: 不是所有的控件路径都返回值
   game.vcxproj -> D:\Program\homework\Programming\game\Debug\game.exe

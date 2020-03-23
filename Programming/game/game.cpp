@@ -4,8 +4,8 @@
 #include <graphics.h>
 #include <cmath>
 #include <string>
-#include <vector>
 #include <set>
+#include <utility>
 #include "game.h"
 
 constexpr int PieceRadius = (int)(1.414 * SymbolSize / 2) + 2;
@@ -13,6 +13,27 @@ constexpr int GridSize = (int)(PieceRadius * 2.22) + 1;
 constexpr int GridWeight = (int)(GridSize / 50);
 
 #define P(pos)              (pos) * GridSize
+
+LOGFONT chessfont;
+std::string board[12] = {
+    "..........",
+    ".rnbakabnr",
+    ".         ",
+    ". c     c ",
+    ".p p p p p",
+    ".         ",
+    ".         ",
+    ".P P P P P",
+    ". C     C ",
+    ".         ",
+    ".RNBAKABNR"
+};
+std::set<std::pair<int, int>> choosings;                                    // store one or two "choosing" piece(s)
+struct Hold {
+    bool isHolding = false;
+    int xPos = 0, yPos = 0;
+    char symbolchar = ' ';
+} hold;                                                                     // the chess you are holding (if you are holding one)
 
 // sqaure of distance from (x0, y0) to (x, y), pure math
 inline int distsquare(int x, int y, int x0, int y0) {
@@ -95,7 +116,6 @@ void drawboard(const int seam = 4, const int dest = 12) {
     setfillcolor(__fillcolor);                                      // reset to origin
 }
 
-LOGFONT chessfont;
 // draw a chess piece at position (x, y)
 void drawpiece(int x, int y, COLORREF color, const wchar_t* symbol, LOGFONT font = chessfont)
 {
@@ -129,13 +149,13 @@ void drawpiece(int x, int y, COLORREF color, const wchar_t* symbol, LOGFONT font
     setlinecolor(__linecolor);                                  // reset to origin
 }
 
-// board[row * 10 + column] represents (row, column)
-std::string board;
 // draw a chess piece at board grid (xPos, yPos)
 void drawpiece(int xPos, int yPos, char symbolchar) {
     COLORREF color = std::islower(symbolchar) ? BLACKCOLOR : REDCOLOR;
 
-    if (symbolchar == 'K') drawpiece(P(yPos), P(xPos), color, _King);
+    if (symbolchar == 'M') drawpiece(P(yPos), P(xPos), LIGHTBLUE, _MUSHROOM);
+
+    else if (symbolchar == 'K') drawpiece(P(yPos), P(xPos), color, _King);
     else if (symbolchar == 'A') drawpiece(P(yPos), P(xPos), color, _Advisor);
     else if (symbolchar == 'B') drawpiece(P(yPos), P(xPos), color, _Bishop);
     else if (symbolchar == 'N') drawpiece(P(yPos), P(xPos), color, _Knight);
@@ -151,11 +171,8 @@ void drawpiece(int xPos, int yPos, char symbolchar) {
     else if (symbolchar == 'p') drawpiece(P(yPos), P(xPos), color, _pawn);
 }
 
-// store one or two "choosing" piece(s)
-std::set<std::pair<int, int>> choosings;
 // show board and all chess pieces and chosen frames
 void render() {
-    // TODO: make some effects for choosing (focus) pieces
     drawboard();
 
     int size = PieceRadius / 2;
@@ -175,8 +192,15 @@ void render() {
 
     for (int row = 1; row <= 10; row++) {                                   // draw pieces
         for (int column = 1; column <= 9; column++) {
-            drawpiece(row, column, board[row * 10 + column]);
+            drawpiece(row, column, board[row][column]);
         }
+    }
+
+    // DEBUG ONLY
+    for (int row = 1; row <= 10; row++) {
+        for (int column = 1; column <= 9; column++)
+            std::cout << ' ' << board[row][column];
+        std::cout << std::endl;
     }
 }
 
@@ -190,6 +214,41 @@ bool ischoosing(MOUSEMSG mouse, int xPos, int yPos) {
     return true;
 }
 
+std::set<std::pair<int, int>> palace;
+bool islegalmove(Hold* hold, int xPos, int yPos) {
+    int HxPos = hold->xPos, HyPos = hold->yPos;
+    int xDist = xPos - HxPos, yDist = yPos - HyPos;
+    int towards = std::islower(hold->symbolchar) ? 1 : -1;
+    bool crossriver = ((xPos / 6) == !!std::islower(hold->symbolchar));
+
+    switch (std::toupper(hold->symbolchar)) {
+    case 'K':
+        if (abs(xDist) + abs(yDist) != 1) return false;
+        return (palace.count(std::make_pair(xPos, yPos)));
+    case 'A':
+        if (abs(xDist) != 1 or abs(yDist) != 1) return false;
+        return (palace.count(std::make_pair(xPos, yPos)));
+    case 'B':
+        if (crossriver) return false;
+        if (abs(xDist) != 2 or abs(yDist) != 2) return false;
+        return (board[HxPos + xDist / 2][HyPos + yDist / 2] == ' ');
+    case 'N':
+        if (abs(xDist * yDist) != 2) return false;
+        return (board[HxPos + xDist / 2][HyPos + yDist / 2] == ' ');
+        // comment: I'm really surprised that Bishops and Knights have formula of blockage exactly THE SAME!!!
+        // Rook and Canon: WIP
+    case 'R':
+        if (xDist * yDist != 0) return false;
+        return true;
+    case 'C':
+        if (xDist * yDist != 0) return false;
+        return true;
+    case 'P':
+        if (xPos == HxPos + towards and yPos == HyPos) return true;
+        return (crossriver and yDist == 1 and xPos == HxPos);
+    }
+}
+
 // everything you shall do before run anything
 void init() {
     gettextstyle(&chessfont);
@@ -198,19 +257,9 @@ void init() {
     _tcscpy_s(chessfont.lfFaceName, CHESSFONT);
     chessfont.lfQuality = ANTIALIASED_QUALITY;
     //setbkmode(TRANSPARENT);
-
-    /*std::string*/ board = \
-        ".........." \
-        ".rnbakabnr" \
-        ".         " \
-        ". c     c " \
-        ".p p p p p" \
-        ".         " \
-        ".         " \
-        ".P P P P P" \
-        ". C     C " \
-        ".         " \
-        ".RNBAKABNR";
+    for (int row : {1, 2, 3, 8, 9, 10})
+        for (int column : {4, 5, 6})
+            palace.insert(std::make_pair(row, column));
 }
 
 int main()
@@ -223,9 +272,6 @@ int main()
     init();
 
     MOUSEMSG mouse;
-    // the chess you are holding (if you are holding one)
-    struct Hold { bool isHolding = false; int xPos = 0, yPos = 0; char symbolchar = ' '; } hold;
-    std::set<std::pair<int, int>> legalmoves;
     bool shall_render = true;
     bool turnflag = false;                                                  // false<->red; true<->black
 
@@ -235,7 +281,6 @@ int main()
             shall_render = false;
             FlushBatchDraw();
         }
-
         if (MouseHit()) {
             mouse = GetMouseMsg();
 
@@ -243,7 +288,7 @@ int main()
                 break;
             }
 
-            else if (mouse.uMsg == WM_RBUTTONDOWN) {
+            else if (mouse.uMsg == WM_RBUTTONDOWN) {                        // cancel all choosings
                 if (choosings.size() > 0) shall_render = true;
                 hold = { false };
                 choosings.clear();
@@ -252,45 +297,36 @@ int main()
             else if (mouse.uMsg == WM_LBUTTONDOWN) {                        // when left-click
                 int xPos = std::round(mouse.y / (double)GridSize);
                 int yPos = std::round(mouse.x / (double)GridSize);          // get where you are hovering on
+                char piecech = board[xPos][yPos];
 
                 if (!ischoosing(mouse, xPos, yPos)) continue;
 
                 if (hold.isHolding) {                                       // try to put down a piece
-                    if (isfriend(hold.symbolchar, board[xPos * 10 + yPos])) {
+                    if (isfriend(hold.symbolchar, board[xPos][yPos])) {
                         choosings.clear();
                         choosings.insert(std::make_pair(xPos, yPos));
-                        hold = { true, xPos, yPos, board[xPos * 10 + yPos] };
+                        hold = { true, xPos, yPos, board[xPos][yPos] };
                         shall_render = true;
                     }
-                    else if (legalmoves.count(std::make_pair(xPos, yPos))) {     // is a legal move
+                    else if (islegalmove(&hold, xPos, yPos)) {     // is a legal move
                         assert(choosings.size() == 1);
                         shall_render = true;
                         turnflag = !turnflag;
 
-                        board[xPos * 10 + yPos] = hold.symbolchar;
-                        board[hold.xPos * 10 + hold.yPos] = ' ';
+                        board[xPos][yPos] = hold.symbolchar;
+                        board[hold.xPos][hold.yPos] = ' ';
                         hold = { false };
                         choosings.insert(std::make_pair(xPos, yPos));
                     }
                 }
 
                 else {                                                      // try to pick up a piece
-                    char piecech = board[xPos * 10 + yPos];
                     if (piecech != ' ' && !!std::islower(piecech) == turnflag) {  // is not empty
                         shall_render = true;
 
                         hold = { true, xPos, yPos, piecech };
                         choosings.clear();
                         choosings.insert(std::make_pair(xPos, yPos));
-                        legalmoves.clear();
-
-                        // TODO: maintain legalmoves
-                        //if (false) // DEBUG ONLY
-                        for (int i = 1; i <= 10; i++)
-                            for (int j = 1; j <= 9; j++) {
-                                if (board[i * 10 + j] == ' ')
-                                    legalmoves.insert(std::make_pair(i, j));
-                            }
                     }
                 }
             }
