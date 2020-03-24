@@ -42,7 +42,7 @@ inline int distsquare(int x, int y, int x0, int y0) {
 
 // are chess A and chess B the same color
 inline bool isfriend(char A, char B) {
-    return (std::islower(A) && std::islower(B) || std::isupper(A) && std::isupper(B));
+    return (std::islower(A) and std::islower(B) or std::isupper(A) and std::isupper(B));
 }
 
 // a better version of solidcircle()
@@ -196,7 +196,6 @@ void render() {
         }
     }
 
-    // DEBUG ONLY
     for (int row = 1; row <= 10; row++) {
         for (int column = 1; column <= 9; column++)
             std::cout << ' ' << board[row][column];
@@ -205,47 +204,70 @@ void render() {
 }
 
 bool ischoosing(MOUSEMSG mouse, int xPos, int yPos) {
-    if (xPos < 1 || xPos > 10 || yPos < 1 || yPos > 9) return false;
+    if (xPos < 1 or xPos > 10 or yPos < 1 or yPos > 9) return false;
 
     int x = mouse.x, x0 = P(yPos);
     int y = mouse.y, y0 = P(xPos);
-    if (distsquare(x, y, x0, y0) > PieceRadius * PieceRadius) return false;
-
-    return true;
+    return (distsquare(x, y, x0, y0) <= (PieceRadius + 1) * (PieceRadius + 1));
 }
 
 std::set<std::pair<int, int>> palace;
 bool islegalmove(Hold* hold, int xPos, int yPos) {
     int HxPos = hold->xPos, HyPos = hold->yPos;
     int xDist = xPos - HxPos, yDist = yPos - HyPos;
-    int towards = std::islower(hold->symbolchar) ? 1 : -1;
     bool crossriver = ((xPos / 6) == !!std::islower(hold->symbolchar));
 
     switch (std::toupper(hold->symbolchar)) {
     case 'K':
         if (abs(xDist) + abs(yDist) != 1) return false;
         return (palace.count(std::make_pair(xPos, yPos)));
+
     case 'A':
         if (abs(xDist) != 1 or abs(yDist) != 1) return false;
         return (palace.count(std::make_pair(xPos, yPos)));
+
     case 'B':
         if (crossriver) return false;
         if (abs(xDist) != 2 or abs(yDist) != 2) return false;
         return (board[HxPos + xDist / 2][HyPos + yDist / 2] == ' ');
+
     case 'N':
         if (abs(xDist * yDist) != 2) return false;
         return (board[HxPos + xDist / 2][HyPos + yDist / 2] == ' ');
         // comment: I'm really surprised that Bishops and Knights have formula of blockage exactly THE SAME!!!
-        // Rook and Canon: WIP
+
     case 'R':
         if (xDist * yDist != 0) return false;
+        {int step = (xDist ^ yDist) > 0 ? 1 : -1;
+        if (xDist) {
+            for (int row = HxPos + step; row != xPos; row += step)
+                if (board[row][yPos] != ' ') return false;
+        }
+        else if (yDist) {
+            for (int clm = HyPos + step; clm != yPos; clm += step)
+                if (board[xPos][clm] != ' ') return false;
+        }}
         return true;
+
     case 'C':
         if (xDist * yDist != 0) return false;
-        return true;
+        {int step = (xDist ^ yDist) > 0 ? 1 : -1;
+        std::set<char> path;
+        if (xDist) {
+            for (int row = HxPos + step; row != xPos + step; row += step)
+                path.insert(board[row][yPos]);
+        }
+        else if (yDist) {
+            for (int clm = HyPos + step; clm != yPos + step; clm += step)
+                path.insert(board[xPos][clm]);
+        }
+        if (path.size() != 1 and path.size() != 3) return false;
+        return (path.size() == 1) == (board[xPos][yPos] == ' ');}
+        // comment: rule code for Rook and Canon is super ugly, looking forward to simplification.
+
     case 'P':
-        if (xPos == HxPos + towards and yPos == HyPos) return true;
-        return (crossriver and yDist == 1 and xPos == HxPos);
+        if (crossriver and yDist == 1 and xDist == 0) return true;
+        return (xDist == (std::islower(hold->symbolchar) ? 1 : -1) and yDist == 0);
     }
 }
 
@@ -264,7 +286,7 @@ void init() {
 
 int main()
 {
-    assert(WindowWidth > P(10) && WindowHeight > P(11));
+    assert(WindowWidth > P(10) and WindowHeight > P(11));
     initgraph(WindowWidth, WindowHeight, SHOWCONSOLE);
     setbkcolor(BKGCOLOR);
     BeginBatchDraw();
@@ -321,7 +343,7 @@ int main()
                 }
 
                 else {                                                      // try to pick up a piece
-                    if (piecech != ' ' && !!std::islower(piecech) == turnflag) {  // is not empty
+                    if (piecech != ' ' and !!std::islower(piecech) == turnflag) {   // is not empty
                         shall_render = true;
 
                         hold = { true, xPos, yPos, piecech };
