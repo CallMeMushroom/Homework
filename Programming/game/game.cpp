@@ -30,7 +30,6 @@ std::string board[12] = {
 };
 std::set<std::pair<int, int>> choosings;                                    // store one or two "choosing" piece(s)
 struct Hold {
-    bool isHolding = false;
     int xPos = 0, yPos = 0;
     char symbolchar = ' ';
 } hold;                                                                     // the chess you are holding (if you are holding one)
@@ -195,12 +194,6 @@ void render() {
             drawpiece(row, column, board[row][column]);
         }
     }
-
-    for (int row = 1; row <= 10; row++) {
-        for (int column = 1; column <= 9; column++)
-            std::cout << ' ' << board[row][column];
-        std::cout << std::endl;
-    }
 }
 
 bool ischoosing(MOUSEMSG mouse, int xPos, int yPos) {
@@ -261,6 +254,7 @@ bool islegalmove(Hold* hold, int xPos, int yPos) {
             for (int clm = HyPos + step; clm != yPos + step; clm += step)
                 path.insert(board[xPos][clm]);
         }
+        path.insert(' ');
         if (path.size() != 1 and path.size() != 3) return false;
         return (path.size() == 1) == (board[xPos][yPos] == ' ');}
         // comment: rule code for Rook and Canon is super ugly, looking forward to simplification.
@@ -295,7 +289,8 @@ int main()
 
     MOUSEMSG mouse;
     bool shall_render = true;
-    bool turnflag = false;                                                  // false<->red; true<->black
+    bool turnflag = REDTURN;
+    std::set<std::pair<int, int>> legalmoves;
 
     while (true) { // for each "frame"
         if (shall_render) {
@@ -312,47 +307,43 @@ int main()
 
             else if (mouse.uMsg == WM_RBUTTONDOWN) {                        // cancel all choosings
                 if (choosings.size() > 0) shall_render = true;
-                hold = { false };
+                hold = { 0, 0, ' ' };
                 choosings.clear();
             }
 
             else if (mouse.uMsg == WM_LBUTTONDOWN) {                        // when left-click
                 int xPos = std::round(mouse.y / (double)GridSize);
                 int yPos = std::round(mouse.x / (double)GridSize);          // get where you are hovering on
-                char piecech = board[xPos][yPos];
+                char target = board[xPos][yPos];                            // name of piece at target intersection
 
                 if (!ischoosing(mouse, xPos, yPos)) continue;
 
-                if (hold.isHolding) {                                       // try to put down a piece
-                    if (isfriend(hold.symbolchar, board[xPos][yPos])) {
-                        choosings.clear();
-                        choosings.insert(std::make_pair(xPos, yPos));
-                        hold = { true, xPos, yPos, board[xPos][yPos] };
-                        shall_render = true;
-                    }
-                    else if (islegalmove(&hold, xPos, yPos)) {     // is a legal move
-                        assert(choosings.size() == 1);
-                        shall_render = true;
-                        turnflag = !turnflag;
+                if (target != ' ' and !!std::islower(target) == turnflag) { // pick up a piece
+                    choosings.clear();
+                    choosings.insert(std::make_pair(xPos, yPos));           // update choosings
+                    hold = { xPos, yPos, target };                    // update hold
+                    shall_render = true;
+
+                    legalmoves.clear();
+                    for (int row = 1; row <= 10; row++)                     // update legalmoves(TODO: rewrite as legalmoves.update())
+                        for (int column = 1; column <= 9; column++)
+                            if (islegalmove(&hold, row, column))
+                                legalmoves.insert(std::make_pair(row, column));
+                }
+
+                else {                                                      // put down a piece
+                    if (legalmoves.count(std::make_pair(xPos, yPos))) {
+                        assert(choosings.size() == 1 and hold.symbolchar != ' ');
 
                         board[xPos][yPos] = hold.symbolchar;
                         board[hold.xPos][hold.yPos] = ' ';
-                        hold = { false };
+                        hold = { 0, 0, ' ' };
                         choosings.insert(std::make_pair(xPos, yPos));
-                    }
-                }
-
-                else {                                                      // try to pick up a piece
-                    if (piecech != ' ' and !!std::islower(piecech) == turnflag) {   // is not empty
+                        turnflag = !turnflag;
                         shall_render = true;
-
-                        hold = { true, xPos, yPos, piecech };
-                        choosings.clear();
-                        choosings.insert(std::make_pair(xPos, yPos));
                     }
                 }
             }
-
             else continue;
         }
         FlushBatchDraw();

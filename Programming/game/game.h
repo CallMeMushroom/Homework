@@ -31,6 +31,9 @@
 #define TEXTCOLOR           WHITE
 #define FOCUSCOLOR          BLUE
 
+#define REDTURN             false
+#define BLACKTURN           true
+
 #define WindowWidth         960
 #define WindowHeight        720
 #define SymbolSize          36                  // SymbolSize *MUST* be an even integer!
