@@ -2,3 +2,5 @@
 *.pdb
 *.db
 *.ipch
+*.db
+*.pdb

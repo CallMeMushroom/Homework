@@ -5,7 +5,7 @@
 #include <cmath>
 #include <string>
 #include <set>
-#include <vector>
+#include <map>
 #include <utility>
 #include "game.h"
 
@@ -68,16 +68,16 @@ public:
     bool region = true;
     std::set<std::pair<int, int>> legalmoves;
 
-    std::pair<int, int> getpos() {
+    inline std::pair<int, int> getpos() {
         return std::make_pair(this->xPos, this->yPos);
     }
 
-    void setpos(int xPos, int yPos) {
+    inline void setpos(int xPos, int yPos) {
         this->xPos = xPos;
         this->yPos = yPos;
     }
 
-    void setpos(std::pair<int, int> pos) {
+    inline void setpos(std::pair<int, int> pos) {
         this->xPos = pos.first;
         this->yPos = pos.second;
     }
@@ -149,8 +149,7 @@ public:
             }
     }
 };
-Piece hold;                                                                     // the chess you are holding (if you are holding one)
-std::vector<Piece> pieces(100);
+std::map<int, Piece> pieces;
 
 // a better version of solidcircle()
 void bettersolidcircle(int x, int y, int radius)
@@ -325,11 +324,12 @@ void init() {
             palace.insert(std::make_pair(row, column));
     for (int row = 1; row <= 10; row++) {
         for (int column = 1; column <= 9; column++) {
+            if (board.numboard[row][column] == 0) continue;
             Piece piece;
             piece.setpos(row, column);
             piece.name = board.chrboard[row][column];
-            piece.region = !!std::islower(piece.name);
             piece.id = board.numboard[row][column];
+            piece.region = !!std::islower(piece.name);
             piece.maintain();
             pieces[piece.id] = piece;
         }
@@ -347,7 +347,9 @@ int main()
 
     MOUSEMSG mouse;
     bool shall_render = true;
+    bool shall_judge = false;
     bool turnflag = REDTURN;
+    Piece hold;                                                             // the chess you are holding (if you are holding one)
 
     while (true) { // for each "frame"
         if (shall_render) {
@@ -355,6 +357,7 @@ int main()
             shall_render = false;
             FlushBatchDraw();
         }
+
         if (MouseHit()) {
             mouse = GetMouseMsg();
 
@@ -373,12 +376,12 @@ int main()
                 int yPos = std::round(mouse.x / (double)GridSize);          // get where you are hovering on
                 if (!ischoosing(mouse, xPos, yPos)) continue;
 
-                char choosing = board.chrboard[xPos][yPos];                       // name of piece at target intersection
+                int id = board.numboard[xPos][yPos];                        // name of piece at target intersection
 
-                if (choosing != ' ' and !!std::islower(choosing) == turnflag) { // pick up a piece
+                if (pieces[id].name != ' ' and pieces[id].region == turnflag) { // pick up a piece
                     board.choosings.clear();
-                    board.choosings.insert(std::make_pair(xPos, yPos));           // update choosings
-                    hold = { xPos, yPos, choosing };                        // update hold
+                    board.choosings.insert(std::make_pair(xPos, yPos));     // update choosings
+                    hold = pieces[id];                                      // update hold
                     shall_render = true;
 
                     hold.maintain();
@@ -388,7 +391,10 @@ int main()
                     if (!hold.legalmoves.count(std::make_pair(xPos, yPos))) continue;
 
                     BoardStatus boardcopy = board;
-                    
+                    auto piecescopy = pieces;
+
+                    if (board.chrboard[xPos][yPos] != 0)
+                        pieces.erase(board.numboard[xPos][yPos]);
                     pieces[hold.id].setpos(xPos, yPos);
                     board.numboard[xPos][yPos] = hold.id;
                     board.chrboard[xPos][yPos] = hold.name;
@@ -399,26 +405,29 @@ int main()
                     board.choosings.insert(std::make_pair(xPos, yPos));
 
                     bool gotchecked = false;
-                    for (auto piece : pieces) {
-                        if (piece.region != turnflag) {
+                    for (auto map : pieces) {
+                        Piece piece = map.second;
+                        if (piece.region != turnflag and piece.name != ' ') {
                             piece.maintain();
+                            std::cout << piece.xPos << ' ' << piece.yPos << ' ' << piece.name << std::endl;
                             if (piece.legalmoves.count(board.kingpos[turnflag]))
                                 gotchecked = true;
                         }
                     }
 
+                    std::cout << std::endl;
                     if (gotchecked) {
                         board = boardcopy;
+                        pieces = piecescopy;
                         continue;
                     }
 
                     hold = { 0, 0, ' ' };
                     turnflag = !turnflag;
                     shall_render = true;
-
+                    shall_judge = true;
                 }
             }
-
             else continue;
         }
     }
