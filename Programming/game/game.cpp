@@ -5,6 +5,7 @@
 #include <cmath>
 #include <string>
 #include <set>
+#include <vector>
 #include <utility>
 #include "game.h"
 
@@ -14,8 +15,21 @@ constexpr int GridWeight = (int)(GridSize / 50);
 
 #define P(pos)              (pos) * GridSize
 
+// sqaure of distance from (x0, y0) to (x, y), pure math
+inline int distsquare(int x, int y, int x0, int y0) {
+    return (x - x0) * (x - x0) + (y - y0) * (y - y0);
+}
+
+// are chess A and chess B the same color
+inline bool isfriend(char A, char B) {
+    return (std::islower(A) and std::islower(B) or std::isupper(A) and std::isupper(B));
+}
+
 LOGFONT chessfont;
-std::string board[12] = {
+
+struct BoardStatus {
+    std::pair<int, int> kingpos[2] = { std::make_pair(10, 5), std::make_pair(1, 5) };
+    std::string chrboard[12] = {
     "..........",
     ".rnbakabnr",
     ".         ",
@@ -27,22 +41,116 @@ std::string board[12] = {
     ". C     C ",
     ".         ",
     ".RNBAKABNR"
-};
-std::set<std::pair<int, int>> choosings;                                    // store one or two "choosing" piece(s)
-struct Hold {
+    };
+    int numboard[11][10] = {
+        {  0,  0,  0,  0,  0,  0,  0,  0,  0,  0 },
+        {  0,  1,  2,  3,  4,  5,  6,  7,  8,  9 },
+        {  0,  0,  0,  0,  0,  0,  0,  0,  0,  0 },
+        {  0,  0, 10,  0,  0,  0,  0,  0, 11,  0 },
+        {  0, 12,  0, 13,  0, 14,  0, 15,  0, 16 },
+        {  0,  0,  0,  0,  0,  0,  0,  0,  0,  0 },
+        {  0,  0,  0,  0,  0,  0,  0,  0,  0,  0 },
+        {  0, 17,  0, 18,  0, 19,  0, 20,  0, 21 },
+        {  0,  0, 22,  0,  0,  0,  0,  0, 23,  0 },
+        {  0,  0,  0,  0,  0,  0,  0,  0,  0,  0 },
+        {  0, 24, 25, 26, 27, 28, 29, 30, 31, 32 },
+    };
+    std::set<std::pair<int, int>> choosings;                                    // store one or two "choosing" piece(s)
+} board;
+
+std::set<std::pair<int, int>> palace;
+
+class Piece {
+public:
     int xPos = 0, yPos = 0;
-    char symbolchar = ' ';
-} hold;                                                                     // the chess you are holding (if you are holding one)
+    char name = ' ';
+    int id = 0;
+    bool region = true;
+    std::set<std::pair<int, int>> legalmoves;
 
-// sqaure of distance from (x0, y0) to (x, y), pure math
-inline int distsquare(int x, int y, int x0, int y0) {
-    return (x - x0) * (x - x0) + (y - y0) * (y - y0);
-}
+    std::pair<int, int> getpos() {
+        return std::make_pair(this->xPos, this->yPos);
+    }
 
-// are chess A and chess B the same color
-inline bool isfriend(char A, char B) {
-    return (std::islower(A) and std::islower(B) or std::isupper(A) and std::isupper(B));
-}
+    void setpos(int xPos, int yPos) {
+        this->xPos = xPos;
+        this->yPos = yPos;
+    }
+
+    void setpos(std::pair<int, int> pos) {
+        this->xPos = pos.first;
+        this->yPos = pos.second;
+    }
+
+    bool islegalmove(int xPos, int yPos) {
+        int xDist = xPos - this->xPos, yDist = yPos - this->yPos;
+        bool crossriver = ((xPos / 6) == !!std::islower(this->name));
+        int step = (xDist ^ yDist) > 0 ? 1 : -1;
+        std::set<char> path;
+
+        switch (std::toupper(this->name)) {
+        case 'K':
+            if (abs(xDist) + abs(yDist) != 1) return false;
+            return (palace.count(std::make_pair(xPos, yPos)));
+
+        case 'A':
+            if (abs(xDist) != 1 or abs(yDist) != 1) return false;
+            return (palace.count(std::make_pair(xPos, yPos)));
+
+        case 'B':
+            if (crossriver) return false;
+            if (abs(xDist) != 2 or abs(yDist) != 2) return false;
+            return (board.chrboard[this->xPos + xDist / 2][this->yPos + yDist / 2] == ' ');
+
+        case 'N':
+            if (abs(xDist * yDist) != 2) return false;
+            return (board.chrboard[this->xPos + xDist / 2][this->yPos + yDist / 2] == ' ');
+            // comment: I'm really surprised that Bishops and Knights have formula of blockage exactly THE SAME!!!
+
+        case 'R':
+            if (xDist * yDist != 0) return false;
+            if (xDist) {
+                for (int row = this->xPos + step; row != xPos; row += step)
+                    if (board.chrboard[row][yPos] != ' ') return false;
+            }
+            else if (yDist) {
+                for (int clm = this->yPos + step; clm != yPos; clm += step)
+                    if (board.chrboard[xPos][clm] != ' ') return false;
+            }
+            return true;
+
+        case 'C':
+            if (xDist * yDist != 0) return false;
+
+            if (xDist) {
+                for (int row = this->xPos + step; row != xPos + step; row += step)
+                    path.insert(board.chrboard[row][yPos]);
+            }
+            else if (yDist) {
+                for (int clm = this->yPos + step; clm != yPos + step; clm += step)
+                    path.insert(board.chrboard[xPos][clm]);
+            }
+            path.insert(' ');
+            if (path.size() != 1 and path.size() != 3) return false;
+            return (path.size() == 1) == (board.chrboard[xPos][yPos] == ' ');
+            // comment: rule code for Rook and Canon is super ugly, looking forward to simplification.
+
+        case 'P':
+            if (crossriver and abs(yDist) == 1 and xDist == 0) return true;
+            return (xDist == (std::islower(this->name) ? 1 : -1) and yDist == 0);
+        }
+    }
+
+    void maintain() {
+        for (int row = 1; row <= 10; row++)
+            for (int column = 1; column <= 9; column++) {
+                if (!isfriend(this->name, board.chrboard[row][column]) and this->islegalmove(row, column))
+                    this->legalmoves.insert(std::make_pair(row, column));
+            }
+    }
+};
+Piece hold;                                                                     // the chess you are holding (if you are holding one)
+std::vector<Piece> pieces(100);
 
 // a better version of solidcircle()
 void bettersolidcircle(int x, int y, int radius)
@@ -176,7 +284,7 @@ void render() {
 
     int size = PieceRadius / 2;
     int sgnlist[][2] = { {-1, -1}, {-1, 1}, {1, -1}, {1, 1} };
-    for (auto choose : choosings) {                                         // draw focuses
+    for (auto choose : board.choosings) {                                         // draw focuses
         int centre_x = P(choose.second), centre_y = P(choose.first);
         for (auto sgn : sgnlist) {
             int x = centre_x + sgn[0] * size;
@@ -191,7 +299,7 @@ void render() {
 
     for (int row = 1; row <= 10; row++) {                                   // draw pieces
         for (int column = 1; column <= 9; column++) {
-            drawpiece(row, column, board[row][column]);
+            drawpiece(row, column, board.chrboard[row][column]);
         }
     }
 }
@@ -202,67 +310,6 @@ bool ischoosing(MOUSEMSG mouse, int xPos, int yPos) {
     int x = mouse.x, x0 = P(yPos);
     int y = mouse.y, y0 = P(xPos);
     return (distsquare(x, y, x0, y0) <= (PieceRadius + 1) * (PieceRadius + 1));
-}
-
-std::set<std::pair<int, int>> palace;
-bool islegalmove(Hold* hold, int xPos, int yPos) {
-    int HxPos = hold->xPos, HyPos = hold->yPos;
-    int xDist = xPos - HxPos, yDist = yPos - HyPos;
-    bool crossriver = ((xPos / 6) == !!std::islower(hold->symbolchar));
-
-    switch (std::toupper(hold->symbolchar)) {
-    case 'K':
-        if (abs(xDist) + abs(yDist) != 1) return false;
-        return (palace.count(std::make_pair(xPos, yPos)));
-
-    case 'A':
-        if (abs(xDist) != 1 or abs(yDist) != 1) return false;
-        return (palace.count(std::make_pair(xPos, yPos)));
-
-    case 'B':
-        if (crossriver) return false;
-        if (abs(xDist) != 2 or abs(yDist) != 2) return false;
-        return (board[HxPos + xDist / 2][HyPos + yDist / 2] == ' ');
-
-    case 'N':
-        if (abs(xDist * yDist) != 2) return false;
-        return (board[HxPos + xDist / 2][HyPos + yDist / 2] == ' ');
-        // comment: I'm really surprised that Bishops and Knights have formula of blockage exactly THE SAME!!!
-
-    case 'R':
-        if (xDist * yDist != 0) return false;
-        {int step = (xDist ^ yDist) > 0 ? 1 : -1;
-        if (xDist) {
-            for (int row = HxPos + step; row != xPos; row += step)
-                if (board[row][yPos] != ' ') return false;
-        }
-        else if (yDist) {
-            for (int clm = HyPos + step; clm != yPos; clm += step)
-                if (board[xPos][clm] != ' ') return false;
-        }}
-        return true;
-
-    case 'C':
-        if (xDist * yDist != 0) return false;
-        {int step = (xDist ^ yDist) > 0 ? 1 : -1;
-        std::set<char> path;
-        if (xDist) {
-            for (int row = HxPos + step; row != xPos + step; row += step)
-                path.insert(board[row][yPos]);
-        }
-        else if (yDist) {
-            for (int clm = HyPos + step; clm != yPos + step; clm += step)
-                path.insert(board[xPos][clm]);
-        }
-        path.insert(' ');
-        if (path.size() != 1 and path.size() != 3) return false;
-        return (path.size() == 1) == (board[xPos][yPos] == ' ');}
-        // comment: rule code for Rook and Canon is super ugly, looking forward to simplification.
-
-    case 'P':
-        if (crossriver and yDist == 1 and xDist == 0) return true;
-        return (xDist == (std::islower(hold->symbolchar) ? 1 : -1) and yDist == 0);
-    }
 }
 
 // everything you shall do before run anything
@@ -276,6 +323,17 @@ void init() {
     for (int row : {1, 2, 3, 8, 9, 10})
         for (int column : {4, 5, 6})
             palace.insert(std::make_pair(row, column));
+    for (int row = 1; row <= 10; row++) {
+        for (int column = 1; column <= 9; column++) {
+            Piece piece;
+            piece.setpos(row, column);
+            piece.name = board.chrboard[row][column];
+            piece.region = !!std::islower(piece.name);
+            piece.id = board.numboard[row][column];
+            piece.maintain();
+            pieces[piece.id] = piece;
+        }
+    }
 }
 
 int main()
@@ -290,7 +348,6 @@ int main()
     MOUSEMSG mouse;
     bool shall_render = true;
     bool turnflag = REDTURN;
-    std::set<std::pair<int, int>> legalmoves;
 
     while (true) { // for each "frame"
         if (shall_render) {
@@ -306,47 +363,64 @@ int main()
             }
 
             else if (mouse.uMsg == WM_RBUTTONDOWN) {                        // cancel all choosings
-                if (choosings.size() > 0) shall_render = true;
+                if (board.choosings.size() > 0) shall_render = true;
                 hold = { 0, 0, ' ' };
-                choosings.clear();
+                board.choosings.clear();
             }
 
             else if (mouse.uMsg == WM_LBUTTONDOWN) {                        // when left-click
                 int xPos = std::round(mouse.y / (double)GridSize);
                 int yPos = std::round(mouse.x / (double)GridSize);          // get where you are hovering on
-                char target = board[xPos][yPos];                            // name of piece at target intersection
-
                 if (!ischoosing(mouse, xPos, yPos)) continue;
 
-                if (target != ' ' and !!std::islower(target) == turnflag) { // pick up a piece
-                    choosings.clear();
-                    choosings.insert(std::make_pair(xPos, yPos));           // update choosings
-                    hold = { xPos, yPos, target };                    // update hold
+                char choosing = board.chrboard[xPos][yPos];                       // name of piece at target intersection
+
+                if (choosing != ' ' and !!std::islower(choosing) == turnflag) { // pick up a piece
+                    board.choosings.clear();
+                    board.choosings.insert(std::make_pair(xPos, yPos));           // update choosings
+                    hold = { xPos, yPos, choosing };                        // update hold
                     shall_render = true;
 
-                    legalmoves.clear();
-                    for (int row = 1; row <= 10; row++)                     // update legalmoves(TODO: rewrite as legalmoves.update())
-                        for (int column = 1; column <= 9; column++)
-                            if (islegalmove(&hold, row, column))
-                                legalmoves.insert(std::make_pair(row, column));
+                    hold.maintain();
                 }
 
-                else {                                                      // put down a piece
-                    if (legalmoves.count(std::make_pair(xPos, yPos))) {
-                        assert(choosings.size() == 1 and hold.symbolchar != ' ');
+                else if (hold.name != ' ') {                                // put down a piece
+                    if (!hold.legalmoves.count(std::make_pair(xPos, yPos))) continue;
 
-                        board[xPos][yPos] = hold.symbolchar;
-                        board[hold.xPos][hold.yPos] = ' ';
-                        hold = { 0, 0, ' ' };
-                        choosings.insert(std::make_pair(xPos, yPos));
-                        turnflag = !turnflag;
-                        shall_render = true;
+                    BoardStatus boardcopy = board;
+                    
+                    pieces[hold.id].setpos(xPos, yPos);
+                    board.numboard[xPos][yPos] = hold.id;
+                    board.chrboard[xPos][yPos] = hold.name;
+                    board.numboard[hold.xPos][hold.yPos] = 0;
+                    board.chrboard[hold.xPos][hold.yPos] = ' ';
+                    if (std::tolower(hold.name) == 'k')
+                        board.kingpos[turnflag] = std::make_pair(xPos, yPos);
+                    board.choosings.insert(std::make_pair(xPos, yPos));
+
+                    bool gotchecked = false;
+                    for (auto piece : pieces) {
+                        if (piece.region != turnflag) {
+                            piece.maintain();
+                            if (piece.legalmoves.count(board.kingpos[turnflag]))
+                                gotchecked = true;
+                        }
                     }
+
+                    if (gotchecked) {
+                        board = boardcopy;
+                        continue;
+                    }
+
+                    hold = { 0, 0, ' ' };
+                    turnflag = !turnflag;
+                    shall_render = true;
+
                 }
             }
+
             else continue;
         }
-        FlushBatchDraw();
     }
 
     drawpiece(P(5), P(10), LIGHTBLUE, _MUSHROOM);
@@ -356,3 +430,4 @@ int main()
     closegraph();
     return 0;
 }
+//end
