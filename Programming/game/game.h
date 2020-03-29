@@ -1,18 +1,18 @@
 #pragma once
 
-#define _King               _T("›")
+#define _Governer           _T("›")
 #define _Advisor            _T("ÊË")
 #define _Bishop             _T("Ïà")
-#define _Knight             _T("ñR")
+#define _Horse              _T("ñR")
 #define _Rook               _T("Ü‡")
 #define _Cannon             _T("ÅÚ")
 #define _Pawn               _T("±ø")
-#define _king               _T("Œ¢")
+#define _general            _T("Œ¢")
 #define _advisor            _T("Ê¿")
 #define _bishop             _T("Ïó")
-#define _knight             _T("ñR")
+#define _horse              _T("ñR")
 #define _rook               _T("Ü‡")
-#define _cannon             _T("³h")
+#define _catapult           _T("³h")
 #define _pawn               _T("×ä")
 #define _MUSHROOM           _T("Ä¢")
 

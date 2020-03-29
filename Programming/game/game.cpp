@@ -31,7 +31,7 @@ struct BoardStatus {
     std::pair<int, int> kingpos[2] = { std::make_pair(10, 5), std::make_pair(1, 5) };
     std::string chrboard[12] = {
     "..........",
-    ".rnbakabnr",
+    ".rhbagabhr",
     ".         ",
     ". c     c ",
     ".p p p p p",
@@ -40,7 +40,7 @@ struct BoardStatus {
     ".P P P P P",
     ". C     C ",
     ".         ",
-    ".RNBAKABNR"
+    ".RHBAGABHR"
     };
     int numboard[11][10] = {
         {  0,  0,  0,  0,  0,  0,  0,  0,  0,  0 },
@@ -54,8 +54,8 @@ struct BoardStatus {
         {  0,  0, 22,  0,  0,  0,  0,  0, 23,  0 },
         {  0,  0,  0,  0,  0,  0,  0,  0,  0,  0 },
         {  0, 24, 25, 26, 27, 28, 29, 30, 31, 32 },
-    };
-    std::set<std::pair<int, int>> choosings;                                    // store one or two "choosing" piece(s)
+    };                                                                      // remember that 5 and 28 are governer and general
+    std::set<std::pair<int, int>> choosings;                                // store one or two "choosing" piece(s)
 } board;
 
 std::set<std::pair<int, int>> palace;
@@ -89,7 +89,7 @@ public:
         std::set<char> path;
 
         switch (std::toupper(this->name)) {
-        case 'K':
+        case 'G':
             if (abs(xDist) + abs(yDist) != 1) return false;
             return (palace.count(std::make_pair(xPos, yPos)));
 
@@ -102,7 +102,7 @@ public:
             if (abs(xDist) != 2 or abs(yDist) != 2) return false;
             return (board.chrboard[this->xPos + xDist / 2][this->yPos + yDist / 2] == ' ');
 
-        case 'N':
+        case 'H':
             if (abs(xDist * yDist) != 2) return false;
             return (board.chrboard[this->xPos + xDist / 2][this->yPos + yDist / 2] == ' ');
             // comment: I'm really surprised that Bishops and Knights have formula of blockage exactly THE SAME!!!
@@ -261,19 +261,19 @@ void drawpiece(int xPos, int yPos, char symbolchar) {
 
     if (symbolchar == 'M') drawpiece(P(yPos), P(xPos), LIGHTBLUE, _MUSHROOM);
 
-    else if (symbolchar == 'K') drawpiece(P(yPos), P(xPos), color, _King);
+    else if (symbolchar == 'G') drawpiece(P(yPos), P(xPos), color, _Governer);
     else if (symbolchar == 'A') drawpiece(P(yPos), P(xPos), color, _Advisor);
     else if (symbolchar == 'B') drawpiece(P(yPos), P(xPos), color, _Bishop);
-    else if (symbolchar == 'N') drawpiece(P(yPos), P(xPos), color, _Knight);
+    else if (symbolchar == 'H') drawpiece(P(yPos), P(xPos), color, _Horse);
     else if (symbolchar == 'R') drawpiece(P(yPos), P(xPos), color, _Rook);
     else if (symbolchar == 'C') drawpiece(P(yPos), P(xPos), color, _Cannon);
     else if (symbolchar == 'P') drawpiece(P(yPos), P(xPos), color, _Pawn);
-    else if (symbolchar == 'k') drawpiece(P(yPos), P(xPos), color, _king);
+    else if (symbolchar == 'g') drawpiece(P(yPos), P(xPos), color, _general);
     else if (symbolchar == 'a') drawpiece(P(yPos), P(xPos), color, _advisor);
     else if (symbolchar == 'b') drawpiece(P(yPos), P(xPos), color, _bishop);
-    else if (symbolchar == 'n') drawpiece(P(yPos), P(xPos), color, _knight);
+    else if (symbolchar == 'h') drawpiece(P(yPos), P(xPos), color, _horse);
     else if (symbolchar == 'r') drawpiece(P(yPos), P(xPos), color, _rook);
-    else if (symbolchar == 'c') drawpiece(P(yPos), P(xPos), color, _cannon);
+    else if (symbolchar == 'c') drawpiece(P(yPos), P(xPos), color, _catapult);
     else if (symbolchar == 'p') drawpiece(P(yPos), P(xPos), color, _pawn);
 }
 
@@ -393,33 +393,39 @@ int main()
                     BoardStatus boardcopy = board;
                     auto piecescopy = pieces;
 
-                    if (board.chrboard[xPos][yPos] != 0)
+                    if (board.chrboard[xPos][yPos] != ' ')
                         pieces.erase(board.numboard[xPos][yPos]);
                     pieces[hold.id].setpos(xPos, yPos);
-                    board.numboard[xPos][yPos] = hold.id;
-                    board.chrboard[xPos][yPos] = hold.name;
-                    board.numboard[hold.xPos][hold.yPos] = 0;
                     board.chrboard[hold.xPos][hold.yPos] = ' ';
-                    if (std::tolower(hold.name) == 'k')
+                    board.numboard[hold.xPos][hold.yPos] = 0;
+                    board.chrboard[xPos][yPos] = hold.name;
+                    board.numboard[xPos][yPos] = hold.id;
+                    if (std::toupper(hold.name) == 'G')
                         board.kingpos[turnflag] = std::make_pair(xPos, yPos);
                     board.choosings.insert(std::make_pair(xPos, yPos));
 
-                    bool gotchecked = false;
+                    bool in_check = false;
+                    bool face_each = (pieces[5].yPos == pieces[28].yPos);
                     for (auto map : pieces) {
                         Piece piece = map.second;
-                        if (piece.region != turnflag and piece.name != ' ') {
+                        if (face_each and (piece.yPos == pieces[5].yPos) and (pieces[5].xPos < piece.xPos and piece.xPos < pieces[28].xPos))
+                            face_each = false;
+                        if (piece.region != turnflag) {
                             piece.maintain();
                             std::cout << piece.xPos << ' ' << piece.yPos << ' ' << piece.name << std::endl;
-                            if (piece.legalmoves.count(board.kingpos[turnflag]))
-                                gotchecked = true;
+                            if (piece.legalmoves.count(board.kingpos[turnflag])) {
+                                in_check = true;
+                                continue;
+                            }
                         }
                     }
 
                     std::cout << std::endl;
-                    if (gotchecked) {
+                    if (in_check or face_each) {
                         board = boardcopy;
                         pieces = piecescopy;
                         continue;
+                        std::cout << in_check << face_each << std::endl;
                     }
 
                     hold = { 0, 0, ' ' };
