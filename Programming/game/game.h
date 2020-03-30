@@ -1,20 +1,20 @@
 #pragma once
 
-#define _Governer           _T("Ž›")
-#define _Advisor            _T("ÊË")
-#define _Bishop             _T("Ïà")
-#define _Horse              _T("ñR")
-#define _Rook               _T("Ü‡")
-#define _Cannon             _T("ÅÚ")
-#define _Pawn               _T("±ø")
-#define _general            _T("Œ¢")
-#define _advisor            _T("Ê¿")
-#define _bishop             _T("Ïó")
-#define _horse              _T("ñR")
-#define _rook               _T("Ü‡")
-#define _catapult           _T("³h")
-#define _pawn               _T("×ä")
-#define _MUSHROOM           _T("Ä¢")
+#define _Governer           _T("\u5e25")            // red King     (or Governer)
+#define _Advisor            _T("\u4ed5")            // red Advisor  (or Counselor)
+#define _Bishop             _T("\u76f8")            // red Bishop   (or Minister)
+#define _Horse              _T("\u99ac")            // red Knight   (or Horse)
+#define _Rook               _T("\u8eca")            // red Rook     (or Chariot)
+#define _Cannon             _T("\u70ae")            // red Cannon
+#define _Pawn               _T("\u5175")            // red Pawn     (or Soldier)
+#define _general            _T("\u5c07")            // black King   (or General)
+#define _advisor            _T("\u58eb")            // black Advisor
+#define _bishop             _T("\u8c61")            // black Bishop (or Elephant)
+#define _horse              _T("\u99ac")            // black Knight (or Horse)
+#define _rook               _T("\u8eca")            // black Rook   (or Chariot)
+#define _catapult           _T("\u7832")            // black Catapult
+#define _pawn               _T("\u5352")            // black Pawn
+#define _MUSHROOM           _T("\u8611")            // CALLMEMUSHROOM! =w=
 
 #define GRAY                0x7F7F7F
 #define OFFWHITE            0xD6EEF7

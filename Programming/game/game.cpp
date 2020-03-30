@@ -28,7 +28,6 @@ inline bool isfriend(char A, char B) {
 LOGFONT chessfont;
 
 struct BoardStatus {
-    std::pair<int, int> kingpos[2] = { std::make_pair(10, 5), std::make_pair(1, 5) };
     std::string chrboard[12] = {
     "..........",
     ".rhbagabhr",
@@ -56,8 +55,18 @@ struct BoardStatus {
         {  0, 24, 25, 26, 27, 28, 29, 30, 31, 32 },
     };                                                                      // remember that 5 and 28 are governer and general
     std::set<std::pair<int, int>> choosings;                                // store one or two "choosing" piece(s)
+
+    inline int numquery(std::pair<int, int> pos) {
+        return this->numboard[pos.first][pos.second];
+    }
+
+    inline char chrquery(std::pair<int, int> pos) {
+        return this->chrboard[pos.first][pos.second];
+    }
+
 } board;
 
+std::set<std::pair<int, int>> intersections;
 std::set<std::pair<int, int>> palace;
 
 class Piece {
@@ -82,7 +91,7 @@ public:
         this->yPos = pos.second;
     }
 
-    bool islegalmove(int xPos, int yPos) {
+    bool inreach(int xPos, int yPos) {
         int xDist = xPos - this->xPos, yDist = yPos - this->yPos;
         bool crossriver = ((xPos / 6) == !!std::islower(this->name));
         int step = (xDist ^ yDist) > 0 ? 1 : -1;
@@ -141,12 +150,16 @@ public:
         }
     }
 
+    bool inreach(std::pair<int, int> pos) {
+        return this->inreach(pos.first, pos.second);
+    }
+
     void maintain() {
-        for (int row = 1; row <= 10; row++)
-            for (int column = 1; column <= 9; column++) {
-                if (!isfriend(this->name, board.chrboard[row][column]) and this->islegalmove(row, column))
-                    this->legalmoves.insert(std::make_pair(row, column));
-            }
+        this->legalmoves.clear();
+        for (auto intersection : intersections) {
+            if (!isfriend(this->name, board.chrquery(intersection)) and this->inreach(intersection))
+                this->legalmoves.insert(intersection);
+        }
     }
 };
 std::map<int, Piece> pieces;
@@ -255,7 +268,7 @@ void drawpiece(int x, int y, COLORREF color, const wchar_t* symbol, LOGFONT font
     setlinecolor(__linecolor);                                  // reset to origin
 }
 
-// draw a chess piece at board grid (xPos, yPos)
+// draw a chess piece whose at board grid (xPos, yPos)
 void drawpiece(int xPos, int yPos, char symbolchar) {
     COLORREF color = std::islower(symbolchar) ? BLACKCOLOR : REDCOLOR;
 
@@ -277,7 +290,12 @@ void drawpiece(int xPos, int yPos, char symbolchar) {
     else if (symbolchar == 'p') drawpiece(P(yPos), P(xPos), color, _pawn);
 }
 
-// show board and all chess pieces and chosen frames
+// draw THE piece
+void drawpiece(Piece piece) {
+    drawpiece(piece.xPos, piece.yPos, piece.name);
+}
+
+// show board and all chess pieces and chosen intersection(s)
 void render() {
     drawboard();
 
@@ -296,13 +314,10 @@ void render() {
         }
     }
 
-    for (int row = 1; row <= 10; row++) {                                   // draw pieces
-        for (int column = 1; column <= 9; column++) {
-            drawpiece(row, column, board.chrboard[row][column]);
-        }
-    }
+    for (auto map : pieces) drawpiece(map.second);
 }
 
+// is the mouse in a circle area of the intersection
 bool ischoosing(MOUSEMSG mouse, int xPos, int yPos) {
     if (xPos < 1 or xPos > 10 or yPos < 1 or yPos > 9) return false;
 
@@ -313,26 +328,29 @@ bool ischoosing(MOUSEMSG mouse, int xPos, int yPos) {
 
 // everything you shall do before run anything
 void init() {
-    gettextstyle(&chessfont);
+    gettextstyle(&chessfont);                                               // initialize chessfont
     chessfont.lfHeight = SymbolSize;
     chessfont.lfWeight = FW_BOLD;
     _tcscpy_s(chessfont.lfFaceName, CHESSFONT);
     chessfont.lfQuality = ANTIALIASED_QUALITY;
     //setbkmode(TRANSPARENT);
-    for (int row : {1, 2, 3, 8, 9, 10})
+    for (int row : {1, 2, 3, 8, 9, 10})                                     // initialize palace
         for (int column : {4, 5, 6})
             palace.insert(std::make_pair(row, column));
-    for (int row = 1; row <= 10; row++) {
-        for (int column = 1; column <= 9; column++) {
-            if (board.numboard[row][column] == 0) continue;
-            Piece piece;
-            piece.setpos(row, column);
-            piece.name = board.chrboard[row][column];
-            piece.id = board.numboard[row][column];
-            piece.region = !!std::islower(piece.name);
-            piece.maintain();
-            pieces[piece.id] = piece;
-        }
+
+    for (int row = 1; row <= 10; row++)                                     // initialize intersections
+        for (int column = 1; column <= 9; column++)
+            intersections.insert(std::make_pair(row, column));
+
+    for (auto intersection : intersections) {                               // initialize pieces
+        if (board.numquery(intersection) == 0) continue;
+        Piece piece;
+        piece.setpos(intersection);
+        piece.name = board.chrquery(intersection);
+        piece.id = board.numquery(intersection);
+        piece.region = !!std::islower(piece.name);
+        piece.maintain();
+        pieces[piece.id] = piece;
     }
 }
 
@@ -358,6 +376,10 @@ int main()
             FlushBatchDraw();
         }
 
+        if (shall_judge) {
+            ;
+        }
+
         if (MouseHit()) {
             mouse = GetMouseMsg();
 
@@ -374,61 +396,59 @@ int main()
             else if (mouse.uMsg == WM_LBUTTONDOWN) {                        // when left-click
                 int xPos = std::round(mouse.y / (double)GridSize);
                 int yPos = std::round(mouse.x / (double)GridSize);          // get where you are hovering on
+                std::pair<int, int> intersection = std::make_pair(xPos, yPos);
                 if (!ischoosing(mouse, xPos, yPos)) continue;
 
-                int id = board.numboard[xPos][yPos];                        // name of piece at target intersection
+                Piece piece = pieces[board.numquery(intersection)];         // piece at target intersection
 
-                if (pieces[id].name != ' ' and pieces[id].region == turnflag) { // pick up a piece
+                if (piece.name != ' ' and piece.region == turnflag) {       // pick up a piece
                     board.choosings.clear();
-                    board.choosings.insert(std::make_pair(xPos, yPos));     // update choosings
-                    hold = pieces[id];                                      // update hold
+                    board.choosings.insert(intersection);                   // update choosings
+                    hold = piece;                                           // update hold
                     shall_render = true;
-
-                    hold.maintain();
                 }
 
                 else if (hold.name != ' ') {                                // put down a piece
-                    if (!hold.legalmoves.count(std::make_pair(xPos, yPos))) continue;
+                    std::cout << hold.name << ' ' << hold.legalmoves.count(intersection);
 
-                    BoardStatus boardcopy = board;
+                    if (!hold.legalmoves.count(intersection)) continue;
+
+                    BoardStatus boardcopy = board;                          // copy orgin
                     auto piecescopy = pieces;
 
-                    if (board.chrboard[xPos][yPos] != ' ')
-                        pieces.erase(board.numboard[xPos][yPos]);
-                    pieces[hold.id].setpos(xPos, yPos);
-                    board.chrboard[hold.xPos][hold.yPos] = ' ';
+                    if (board.chrquery(intersection) != ' ')
+                        pieces.erase(board.numquery(intersection));         // is captured
+                    pieces[hold.id].setpos(intersection);                   // modify pieces
+
+                    board.chrboard[hold.xPos][hold.yPos] = ' ';             // modify board
                     board.numboard[hold.xPos][hold.yPos] = 0;
                     board.chrboard[xPos][yPos] = hold.name;
                     board.numboard[xPos][yPos] = hold.id;
-                    if (std::toupper(hold.name) == 'G')
-                        board.kingpos[turnflag] = std::make_pair(xPos, yPos);
-                    board.choosings.insert(std::make_pair(xPos, yPos));
+                    board.choosings.insert(intersection);                   // modify choosings
 
-                    bool in_check = false;
-                    bool face_each = (pieces[5].yPos == pieces[28].yPos);
-                    for (auto map : pieces) {
-                        Piece piece = map.second;
-                        if (face_each and (piece.yPos == pieces[5].yPos) and (pieces[5].xPos < piece.xPos and piece.xPos < pieces[28].xPos))
-                            face_each = false;
+                    bool in_check = false;                                  // default: this move does NOT lead to be in check
+                    bool face_each = (pieces[5].yPos == pieces[28].yPos);   // default: kings DO face each other, if in same column
+                    for (auto& map : pieces) {
+                        Piece& piece = map.second;
+                        if (face_each and (piece.yPos == pieces[5].yPos))
+                            if (pieces[5].xPos < piece.xPos and piece.xPos < pieces[28].xPos)
+                                face_each = false;                          // if any piece is between kings => they do NOT face each other.
                         if (piece.region != turnflag) {
                             piece.maintain();
-                            std::cout << piece.xPos << ' ' << piece.yPos << ' ' << piece.name << std::endl;
-                            if (piece.legalmoves.count(board.kingpos[turnflag])) {
-                                in_check = true;
-                                continue;
+                            if (piece.legalmoves.count(pieces[turnflag ? 5 : 28].getpos())) {
+                                in_check = true;                            // if any enemy piece is checking king => illegal move
+                                break;
                             }
                         }
                     }
 
-                    std::cout << std::endl;
-                    if (in_check or face_each) {
+                    if (in_check or face_each) {                            // move leads to be in check => move is illegal
                         board = boardcopy;
                         pieces = piecescopy;
                         continue;
-                        std::cout << in_check << face_each << std::endl;
                     }
-
-                    hold = { 0, 0, ' ' };
+                    
+                    hold = { 0, 0, ' ' };                                   // move is perfectly legal. ready for next move
                     turnflag = !turnflag;
                     shall_render = true;
                     shall_judge = true;
